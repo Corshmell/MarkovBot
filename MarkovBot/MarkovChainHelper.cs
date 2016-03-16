@@ -52,17 +52,28 @@ namespace MarkovBot
             {
                 if (File.Exists(path: JsonMessageFileLocation))
                 {
-                    JsonList =
-                        JsonConvert.DeserializeObject<List<JsonMessage>>(Open());
-                    ulong id = JsonList.Last(item => item.CI == 85842104034541568).MI;
+                    JsonList = JsonConvert.DeserializeObject<List<JsonMessage>>(Open());
+
                     foreach (JsonMessage message in JsonList)
                     {
-                        _markovChain.feed(message.M);
+                        _markovChain.feed(message.M); 
                             //Any messages here have already been thru all the if checks, and hence, we dont need to run thru all of those again.
                     }
+
                     _isInitialized = true;
 
-                    List<Message> list = await DownloadMessagesAfterId(id, _client.GetChannel(85842104034541568));
+                    List<Message> list = new List<Message>();
+
+                    foreach (Server server in _client.Servers)
+                    {
+                        Channel channel = server.DefaultChannel;
+                        ulong id = JsonList.Last(item => item.CI == channel.Id).MI;
+                        if (id != null && channel.DownloadMessages(1).Result[0].Id == id)
+                        {
+                            list.AddRange(await DownloadMessagesAfterId(id, channel));
+                        }
+                    }
+
                     foreach (Message message in list)
                     {
                         FeedMarkovChain(message);
@@ -70,9 +81,12 @@ namespace MarkovBot
                 }
                 else
                 {
-                    List<Message> list = await GetMessagesFromChannel(_client.GetChannel(85842104034541568), 10000);
-                    list.AddRange(await GetMessagesFromChannel(_client.GetChannel(96786127238725632), 2000));
-                    list.AddRange(await GetMessagesFromChannel(_client.GetChannel(94122326802571264), 2000));
+                    List<Message> list = new List<Message>();
+                    foreach (Server server in _client.Servers)
+                    {
+                        list.AddRange(await GetMessagesFromChannel(server.DefaultChannel, 2000));
+                    }
+
                     foreach (Message message in list)
                     {
                         if (message != null && !message.Text.Equals(""))
@@ -129,17 +143,16 @@ namespace MarkovBot
         {
             if (_isInitialized)
             {
-                return _markovChain.generateSentence();
+                return _markovChain.generateSentence().Replace(" .",".");
             }
-            return "I'm not ready yet Senpai!";
+            return "I'm not ready yet.";
         }
 
         private void FeedMarkovChain(Message message)
         {
             if (!message.User.Name.ToLower().Contains(Program.Client.CurrentUser.Name.ToLower()))
             {
-                if (!message.Text.Equals("") && !message.Text.Equals(" ") && !message.Text.Contains("http") &&
-                    !message.Text.ToLower().Contains("testmarkov"))
+                if (!message.Text.Equals("") && !message.Text.Equals(" ") && !message.Text.Contains("http"))
                 {
                     if (message.Text.Contains("."))
                     {
@@ -188,12 +201,16 @@ namespace MarkovBot
 
         public void Save()
         {
-            var text = Encoding.Default.GetBytes(JsonConvert.SerializeObject(JsonList, Newtonsoft.Json.Formatting.None));
-            using (var fileStream = File.Open(JsonMessageFileLocation, FileMode.OpenOrCreate))
+            if (_isInitialized)
             {
-                using (var stream = new GZipStream(fileStream, CompressionMode.Compress))
+                var text = Encoding.Default.GetBytes(JsonConvert.SerializeObject(JsonList, Formatting.None));
+                using (var fileStream = File.Open(JsonMessageFileLocation, FileMode.OpenOrCreate))
                 {
-                    stream.Write(text, 0, text.Length); // Write to the `stream` here and the result will be compressed
+                    using (var stream = new GZipStream(fileStream, CompressionMode.Compress))
+                    {
+                        stream.Write(text, 0, text.Length);
+                            // Write to the `stream` here and the result will be compressed
+                    }
                 }
             }
         }
