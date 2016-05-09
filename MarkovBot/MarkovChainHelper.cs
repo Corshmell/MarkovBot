@@ -20,7 +20,7 @@ namespace MarkovBot
         private static List<JsonMessage> JsonList = new List<JsonMessage>();
 
         public static string RootDirectory = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).FullName;
-        public static string JsonMessageFileLocation => RootDirectory + "\\messages.zip";
+        public static string JsonMessageFileLocation => RootDirectory + "/messages.zip";
 
 
         public MarkovChainHelper(int depth) : this(Program.Client, depth)
@@ -89,22 +89,15 @@ namespace MarkovBot
 
                     foreach (Message message in list)
                     {
-                        if (message != null && !message.Text.Equals(""))
+                        if (message?.User != null && !message.Text.Equals(""))
                         {
                             FeedMarkovChain(message);
-                            var json = new JsonMessage
-                            {
-                                M = message.Text,
-                                MI = message.Id,
-                                CI = message.Channel.Id,
-                            };
-                            JsonList.Add(json);
                         }
                     }
                 }
                 return _isInitialized = true;
             }
-            return _isInitialized;
+            return _isInitialized = true;
         }
 
         private async Task<List<Message>> DownloadMessagesAfterId(ulong id, Channel channel)
@@ -150,24 +143,31 @@ namespace MarkovBot
 
         private void FeedMarkovChain(Message message)
         {
-            if (!message.User.Name.ToLower().Contains(Program.Client.CurrentUser.Name.ToLower()))
+            try
             {
-                if (!message.Text.Equals("") && !message.Text.Equals(" ") && !message.Text.Contains("http"))
+                if (message.User.Id != Program.Client.CurrentUser.Id)
                 {
-                    if (message.Text.Contains("."))
+                    if (!message.Text.Equals("") && !message.Text.Equals(" ") && !message.Text.Contains("http"))
                     {
-                        _markovChain.feed(message.Text);
-                    }
-                    _markovChain.feed(message.Text + ".");
+                        if (message.Text.Contains("."))
+                        {
+                            _markovChain.feed(message.Text);
+                        }
+                        _markovChain.feed(message.Text + ".");
 
-                    var json = new JsonMessage
-                    {
-                        M = message.Text,
-                        MI = message.Id,
-                        CI = message.Channel.Id,
-                    };
-                    JsonList.Add(json);
+                        var json = new JsonMessage
+                        {
+                            M = message.Text,
+                            MI = message.Id,
+                            CI = message.Channel.Id,
+                        };
+                        JsonList.Add(json);
+                    }
                 }
+            }
+            catch
+            {
+                Console.WriteLine(message.User);
             }
         }
 
